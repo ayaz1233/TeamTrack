@@ -13,13 +13,13 @@ $foutmelding = '';
 // Controleer of het formulier is verstuurd.
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
-    // Haal de ingevulde gegevens uit het formulier.
+    // Haal het ingevulde e-mailadres en wachtwoord uit het formulier.
     $email = $_POST['email'];
     $wachtwoord = $_POST['wachtwoord'];
 
     // Zoek de gebruiker met het ingevulde e-mailadres.
-    // Het vraagteken zorgt ervoor dat de invoer niet direct
-    // in de SQL-query wordt geplaatst.
+    // Het vraagteken zorgt ervoor dat de invoer niet
+    // direct in de SQL-query wordt geplaatst.
     $sql = "SELECT * FROM user WHERE email = ?";
 
     // Bereid de SQL-query veilig voor.
@@ -31,23 +31,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // Haal de gevonden gebruiker op uit de database.
     $gebruiker = $stmt->fetch();
 
-    // Controleer:
-    // 1. Of de gebruiker bestaat.
-    // 2. Of het ingevulde wachtwoord klopt met de opgeslagen hash.
+    // Controleer of:
+    // 1. De gebruiker bestaat.
+    // 2. Het ingevulde wachtwoord klopt.
     if ($gebruiker && password_verify($wachtwoord, $gebruiker['password_hash'])) {
 
         // Maak na het inloggen een nieuw sessie-ID.
         // Dit maakt de sessie veiliger.
         session_regenerate_id(true);
 
-        // Bewaar de gegevens van de ingelogde gebruiker in de sessie.
+        // Bewaar belangrijke gegevens van de gebruiker in de sessie.
         $_SESSION['user_id'] = $gebruiker['user_id'];
         $_SESSION['naam'] = $gebruiker['naam'];
         $_SESSION['rol'] = $gebruiker['rol'];
         $_SESSION['team_id'] = $gebruiker['team_id'];
 
-        // Voor nu tonen we alleen dat het inloggen is gelukt.
-        echo 'Inloggen gelukt.';
+        // Controleer welke rol de gebruiker heeft.
+        if ($gebruiker['rol'] === 'trainer') {
+
+            // Een trainer gaat naar het trainer-dashboard.
+            header('Location: trainer/dashboard.php');
+            exit;
+
+        } else {
+
+            // Een sporter gaat naar het sporter-dashboard.
+            header('Location: sporter/dashboard.php');
+            exit;
+        }
 
     } else {
 
@@ -74,10 +85,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <h2>Inloggen</h2>
 
     <?php
+
     // Toon de foutmelding alleen als er een fout is.
     if ($foutmelding != '') {
         echo '<p>' . htmlspecialchars($foutmelding) . '</p>';
     }
+
     ?>
 
     <form method="POST">
