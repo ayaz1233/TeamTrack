@@ -12,7 +12,7 @@ if (!isset($_SESSION['user_id'])) {
     exit;
 }
 
-// Alleen een sporter mag deze pagina openen.
+// Alleen sporters mogen deze pagina gebruiken.
 if ($_SESSION['rol'] !== 'sporter') {
     die('Geen toegang tot deze pagina.');
 }
@@ -21,102 +21,136 @@ if ($_SESSION['rol'] !== 'sporter') {
 $userId = $_SESSION['user_id'];
 $teamId = $_SESSION['team_id'];
 
-// Hier bewaren we meldingen voor de gebruiker.
 $melding = '';
 $foutmelding = '';
 
 
 // ----------------------------------------------------
-// AANWEZIGHEID OPSLAAN
+// AANWEZIGHEID DOOR SPORTER OPSLAAN
 // ----------------------------------------------------
 
-// Controleer of het aanwezigheidsformulier is verstuurd.
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     $trainingId = $_POST['training_id'];
     $status = $_POST['status'];
 
-    // Alleen deze twee waarden zijn toegestaan.
-    if ($status !== 'aanwezig' && $status !== 'afwezig') {
+    // Controleer of de status geldig is.
+    if (
+        $status !== 'aanwezig'
+        && $status !== 'afwezig'
+    ) {
 
         $foutmelding = 'Ongeldige keuze.';
 
     } else {
 
-        // Zoek de training.
-        // We controleren ook direct of deze training
-        // bij het team van de ingelogde sporter hoort.
-        $sql = "SELECT * FROM training
+        // Controleer of de training bij het eigen team hoort.
+        $sql = "SELECT *
+                FROM training
                 WHERE training_id = ?
                 AND team_id = ?";
 
         $stmt = $pdo->prepare($sql);
-        $stmt->execute([$trainingId, $teamId]);
+
+        $stmt->execute([
+            $trainingId,
+            $teamId
+        ]);
 
         $training = $stmt->fetch();
 
-        // Training bestaat niet of hoort bij een ander team.
+
         if (!$training) {
 
             $foutmelding = 'Geen toegang tot deze training.';
 
         } else {
 
-            // Controleer of de reactiedeadline voorbij is.
-            $nu = date('Y-m-d H:i:s');
+            // Controleer of er al een aanwezigheid bestaat.
+            $sql = "SELECT *
+                    FROM attendance
+                    WHERE training_id = ?
+                    AND user_id = ?";
 
+            $stmt = $pdo->prepare($sql);
+
+            $stmt->execute([
+                $trainingId,
+                $userId
+            ]);
+
+            $attendance = $stmt->fetch();
+
+
+            // ------------------------------------------------
+            // DEFINITIEVE STATUS CONTROLEREN
+            // ------------------------------------------------
+
+            // Als de trainer de aanwezigheid definitief heeft
+            // gemaakt, mag de sporter deze niet meer veranderen.
             if (
-                $training['reactiedeadline'] != null &&
-                $nu > $training['reactiedeadline']
+                $attendance
+                && $attendance['is_definitief'] == 1
             ) {
 
-                $foutmelding = 'De reactiedeadline is voorbij.';
+                $foutmelding =
+                    'Deze aanwezigheid is definitief en kan niet meer worden gewijzigd.';
 
             } else {
 
-                // Controleer of de sporter al een keuze heeft gemaakt.
-                $sql = "SELECT * FROM attendance
-                        WHERE training_id = ?
-                        AND user_id = ?";
+                // Controleer de reactiedeadline.
+                $nu = date('Y-m-d H:i:s');
 
-                $stmt = $pdo->prepare($sql);
-                $stmt->execute([$trainingId, $userId]);
+                if (
+                    $training['reactiedeadline'] != null
+                    && $nu > $training['reactiedeadline']
+                ) {
 
-                $attendance = $stmt->fetch();
-
-                if ($attendance) {
-
-                    // Er bestaat al een keuze.
-                    // Werk de bestaande keuze bij.
-                    $sql = "UPDATE attendance
-                            SET status = ?
-                            WHERE training_id = ?
-                            AND user_id = ?";
-
-                    $stmt = $pdo->prepare($sql);
-                    $stmt->execute([
-                        $status,
-                        $trainingId,
-                        $userId
-                    ]);
+                    $foutmelding =
+                        'De reactiedeadline voor deze training is voorbij.';
 
                 } else {
 
-                    // Er bestaat nog geen keuze.
-                    // Voeg een nieuwe aanwezigheid toe.
-                    $sql = "INSERT INTO attendance
-                            (training_id, user_id, status, is_definitief)
-                            VALUES (?, ?, ?, 0)";
+                    // Als er al een keuze bestaat,
+                    // wordt deze aangepast.
+                    if ($attendance) {
 
-                    $stmt = $pdo->prepare($sql);
-                    $stmt->execute([
-                        $trainingId,
-                        $userId,
-                        $status
-                    ]);
+                        $sql = "UPDATE attendance
+                                SET status = ?
+                                WHERE training_id = ?
+                                AND user_id = ?";
+
+                        $stmt = $pdo->prepare($sql);
+
+                        $stmt->execute([
+                            $status,
+                            $trainingId,
+                            $userId
+                        ]);
+
+                    } else {
+
+                        // Anders maken we een nieuwe registratie.
+                        $sql = "INSERT INTO attendance
+                                (
+                                    training_id,
+                                    user_id,
+                                    status,
+                                    is_definitief
+                                )
+                                VALUES (?, ?, ?, 0)";
+
+                        $stmt = $pdo->prepare($sql);
+
+                        $stmt->execute([
+                            $trainingId,
+                            $userId,
+                            $status
+                        ]);
+                    }
+
+                    $melding = 'Je aanwezigheid is opgeslagen.';
                 }
-
-                $melding = 'Je aanwezigheid is opgeslagen.';
             }
         }
     }
@@ -124,16 +158,33 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 
 // ----------------------------------------------------
-// TRAININGEN OPHALEN
+// TRAININGEN VAN EIGEN TEAM OPHALEN
 // ----------------------------------------------------
 
-// Haal alleen trainingen van het eigen team op.
-$sql = "SELECT * FROM training
-        WHERE team_id = ?
-        ORDER BY datum ASC, tijd ASC";
+// LEFT JOIN zorgt ervoor dat we ook direct
+// de aanwezigheid van deze sporter kunnen tonen.
+$sql = "SELECT
+            training.*,
+            attendance.status,
+            attendance.is_definitief
+
+        FROM training
+
+        LEFT JOIN attendance
+        ON training.training_id = attendance.training_id
+        AND attendance.user_id = ?
+
+        WHERE training.team_id = ?
+
+        ORDER BY training.datum ASC,
+                 training.tijd ASC";
 
 $stmt = $pdo->prepare($sql);
-$stmt->execute([$teamId]);
+
+$stmt->execute([
+    $userId,
+    $teamId
+]);
 
 $trainingen = $stmt->fetchAll();
 
@@ -159,10 +210,11 @@ $trainingen = $stmt->fetchAll();
         <?php echo htmlspecialchars($_SESSION['naam']); ?>
     </h2>
 
-    <p>Je bent ingelogd als sporter.</p>
+    <p>
+        Je bent ingelogd als sporter.
+    </p>
 
 
-    <!-- Succesmelding -->
     <?php if ($melding != '') { ?>
 
         <p>
@@ -172,7 +224,6 @@ $trainingen = $stmt->fetchAll();
     <?php } ?>
 
 
-    <!-- Foutmelding -->
     <?php if ($foutmelding != '') { ?>
 
         <p>
@@ -187,9 +238,7 @@ $trainingen = $stmt->fetchAll();
 
     <?php if (count($trainingen) > 0) { ?>
 
-
         <?php foreach ($trainingen as $training) { ?>
-
 
             <div>
 
@@ -211,29 +260,43 @@ $trainingen = $stmt->fetchAll();
                 <br>
 
 
-                <strong>Status training:</strong>
+                <?php if ($training['gewijzigd'] == 1) { ?>
 
-                <?php
+                    <strong>
+                        Deze training is gewijzigd.
+                    </strong>
 
-                // Laat zien of de training is gewijzigd.
-                if ($training['gewijzigd'] == 1) {
+                    <br>
 
-                    echo 'Gewijzigd';
-
-                } else {
-
-                    echo 'Gepland';
-                }
-
-                ?>
-
-                <br>
+                <?php } ?>
 
 
                 <strong>Reactiedeadline:</strong>
 
                 <?php
-                echo htmlspecialchars($training['reactiedeadline']);
+                echo htmlspecialchars(
+                    $training['reactiedeadline']
+                );
+                ?>
+
+                <br>
+
+
+                <strong>Mijn keuze:</strong>
+
+                <?php
+
+                if ($training['status'] != null) {
+
+                    echo htmlspecialchars(
+                        ucfirst($training['status'])
+                    );
+
+                } else {
+
+                    echo 'Nog niet ingevuld';
+                }
+
                 ?>
 
                 <br><br>
@@ -241,24 +304,55 @@ $trainingen = $stmt->fetchAll();
 
                 <?php
 
-                // Controleer of de deadline nog niet voorbij is.
-                $nu = date('Y-m-d H:i:s');
+                // Bepaal of de deadline voorbij is.
+                $deadlineVoorbij = false;
 
                 if (
-                    $training['reactiedeadline'] == null ||
-                    $nu <= $training['reactiedeadline']
+                    $training['reactiedeadline'] != null
+                    && date('Y-m-d H:i:s')
+                        > $training['reactiedeadline']
                 ) {
+                    $deadlineVoorbij = true;
+                }
 
                 ?>
 
 
-                    <!-- Formulier om aanwezigheid door te geven -->
+                <?php if ($training['is_definitief'] == 1) { ?>
+
+                    <strong>
+                        Definitieve aanwezigheid:
+                        <?php
+                        echo htmlspecialchars(
+                            ucfirst($training['status'])
+                        );
+                        ?>
+                    </strong>
+
+                    <p>
+                        Deze status is door de trainer definitief gemaakt.
+                    </p>
+
+
+                <?php } elseif ($deadlineVoorbij) { ?>
+
+                    <p>
+                        De reactiedeadline is voorbij.
+                    </p>
+
+
+                <?php } else { ?>
+
+                    <!-- Sporter kan vóór de deadline reageren. -->
+
                     <form method="POST">
 
                         <input
                             type="hidden"
                             name="training_id"
-                            value="<?php echo $training['training_id']; ?>"
+                            value="<?php
+                                echo $training['training_id'];
+                            ?>"
                         >
 
 
@@ -281,30 +375,20 @@ $trainingen = $stmt->fetchAll();
 
                     </form>
 
-
-                <?php
-
-                } else {
-
-                    echo '<p>De reactiedeadline is voorbij.</p>';
-                }
-
-                ?>
+                <?php } ?>
 
 
                 <hr>
 
             </div>
 
-
         <?php } ?>
-
 
     <?php } else { ?>
 
-
-        <p>Er zijn nog geen trainingen gepland.</p>
-
+        <p>
+            Er zijn nog geen trainingen gepland.
+        </p>
 
     <?php } ?>
 
@@ -314,7 +398,6 @@ $trainingen = $stmt->fetchAll();
             Uitloggen
         </a>
     </p>
-
 
 </body>
 
