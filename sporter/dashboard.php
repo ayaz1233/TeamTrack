@@ -34,7 +34,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $trainingId = $_POST['training_id'];
     $status = $_POST['status'];
 
-    // Controleer of de status geldig is.
+    // Alleen deze twee waarden zijn toegestaan.
     if (
         $status !== 'aanwezig'
         && $status !== 'afwezig'
@@ -44,7 +44,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     } else {
 
-        // Controleer of de training bij het eigen team hoort.
+        // Controleer of de training bij het team
+        // van de sporter hoort.
         $sql = "SELECT *
                 FROM training
                 WHERE training_id = ?
@@ -66,7 +67,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         } else {
 
-            // Controleer of er al een aanwezigheid bestaat.
+            // Kijk of er al een aanwezigheid bestaat.
             $sql = "SELECT *
                     FROM attendance
                     WHERE training_id = ?
@@ -82,12 +83,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $attendance = $stmt->fetch();
 
 
-            // ------------------------------------------------
-            // DEFINITIEVE STATUS CONTROLEREN
-            // ------------------------------------------------
-
-            // Als de trainer de aanwezigheid definitief heeft
-            // gemaakt, mag de sporter deze niet meer veranderen.
+            // Als de trainer de aanwezigheid definitief
+            // heeft gemaakt, mag de sporter niet wijzigen.
             if (
                 $attendance
                 && $attendance['is_definitief'] == 1
@@ -111,8 +108,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 } else {
 
-                    // Als er al een keuze bestaat,
-                    // wordt deze aangepast.
+                    // Bestaande keuze aanpassen.
                     if ($attendance) {
 
                         $sql = "UPDATE attendance
@@ -130,7 +126,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                     } else {
 
-                        // Anders maken we een nieuwe registratie.
+                        // Nieuwe keuze opslaan.
                         $sql = "INSERT INTO attendance
                                 (
                                     training_id,
@@ -158,11 +154,73 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 
 // ----------------------------------------------------
-// TRAININGEN VAN EIGEN TEAM OPHALEN
+// PERSOONLIJKE DOELEN OPHALEN
+// FE-08
 // ----------------------------------------------------
 
-// LEFT JOIN zorgt ervoor dat we ook direct
-// de aanwezigheid van deze sporter kunnen tonen.
+// Alleen doelen van de ingelogde sporter worden opgehaald.
+$sql = "SELECT *
+        FROM goal
+        WHERE user_id = ?
+        ORDER BY goal_id DESC";
+
+$stmt = $pdo->prepare($sql);
+$stmt->execute([$userId]);
+
+$doelen = $stmt->fetchAll();
+
+
+// ----------------------------------------------------
+// AANWEZIGHEIDSPERCENTAGE BEREKENEN
+// FE-09
+// ----------------------------------------------------
+
+// We tellen alleen definitieve registraties.
+// Daardoor telt een voorlopige keuze nog niet mee.
+$sql = "SELECT
+            COUNT(*) AS totaal,
+            SUM(
+                CASE
+                    WHEN status = 'aanwezig'
+                    THEN 1
+                    ELSE 0
+                END
+            ) AS aanwezig
+
+        FROM attendance
+
+        WHERE user_id = ?
+        AND is_definitief = 1";
+
+$stmt = $pdo->prepare($sql);
+$stmt->execute([$userId]);
+
+$aanwezigheid = $stmt->fetch();
+
+$totaalDefinitief = (int) $aanwezigheid['totaal'];
+$aantalAanwezig = (int) $aanwezigheid['aanwezig'];
+
+
+// Belangrijk:
+// als er nog geen definitieve registraties zijn,
+// delen we niet door 0.
+if ($totaalDefinitief > 0) {
+
+    $aanwezigheidspercentage =
+        round(
+            ($aantalAanwezig / $totaalDefinitief) * 100
+        );
+
+} else {
+
+    $aanwezigheidspercentage = 0;
+}
+
+
+// ----------------------------------------------------
+// TRAININGEN VAN HET EIGEN TEAM OPHALEN
+// ----------------------------------------------------
+
 $sql = "SELECT
             training.*,
             attendance.status,
@@ -232,6 +290,99 @@ $trainingen = $stmt->fetchAll();
 
     <?php } ?>
 
+
+    <!-- ============================================= -->
+    <!-- MIJN VOORTGANG -->
+    <!-- ============================================= -->
+
+    <h3>Mijn voortgang</h3>
+
+    <p>
+        <strong>Aanwezigheidspercentage:</strong>
+
+        <?php
+        echo $aanwezigheidspercentage;
+        ?>%
+    </p>
+
+
+    <?php if ($totaalDefinitief == 0) { ?>
+
+        <p>
+            Er zijn nog geen definitieve aanwezigheden geregistreerd.
+        </p>
+
+    <?php } else { ?>
+
+        <p>
+            Aanwezig bij
+            <?php echo $aantalAanwezig; ?>
+            van de
+            <?php echo $totaalDefinitief; ?>
+            definitieve trainingen.
+        </p>
+
+    <?php } ?>
+
+
+    <!-- ============================================= -->
+    <!-- MIJN DOELEN -->
+    <!-- ============================================= -->
+
+    <h3>Mijn doelen</h3>
+
+
+    <?php if (count($doelen) > 0) { ?>
+
+        <?php foreach ($doelen as $doel) { ?>
+
+            <div>
+
+                <strong>
+                    <?php
+                    echo htmlspecialchars($doel['titel']);
+                    ?>
+                </strong>
+
+                <br>
+
+                Voortgang:
+
+                <?php
+                echo htmlspecialchars($doel['voortgang']);
+                ?>%
+
+                <br>
+
+                <!-- Eenvoudige voortgangsbalk. -->
+                <progress
+                    value="<?php
+                        echo htmlspecialchars(
+                            $doel['voortgang']
+                        );
+                    ?>"
+                    max="100"
+                >
+                </progress>
+
+                <hr>
+
+            </div>
+
+        <?php } ?>
+
+    <?php } else { ?>
+
+        <p>
+            Je hebt nog geen persoonlijke doelen.
+        </p>
+
+    <?php } ?>
+
+
+    <!-- ============================================= -->
+    <!-- MIJN TRAININGEN -->
+    <!-- ============================================= -->
 
     <h3>Mijn trainingen</h3>
 
@@ -304,7 +455,7 @@ $trainingen = $stmt->fetchAll();
 
                 <?php
 
-                // Bepaal of de deadline voorbij is.
+                // Controleer of de deadline voorbij is.
                 $deadlineVoorbij = false;
 
                 if (
@@ -312,6 +463,7 @@ $trainingen = $stmt->fetchAll();
                     && date('Y-m-d H:i:s')
                         > $training['reactiedeadline']
                 ) {
+
                     $deadlineVoorbij = true;
                 }
 
@@ -342,8 +494,6 @@ $trainingen = $stmt->fetchAll();
 
 
                 <?php } else { ?>
-
-                    <!-- Sporter kan vóór de deadline reageren. -->
 
                     <form method="POST">
 
