@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 
 // Start de sessie.
 session_start();
@@ -76,9 +76,11 @@ $oefeningen = $stmt->fetchAll();
 <head>
 
     <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 
     <title>TeamTrack - Oefeningen</title>
 
+<link rel="stylesheet" href="../css/style.css">
 </head>
 
 <body>

@@ -1,0 +1,159 @@
+/* =========================================
+   TEAMTRACK ALGEMENE OPMAAK
+   ========================================= */
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    padding: 30px;
+    font-family: Arial, sans-serif;
+    background: #F8FAFC;
+    color: #0F172A;
+    line-height: 1.5;
+}
+
+
+/* =========================================
+   TITELS
+   ========================================= */
+
+h1 {
+    background: #052E16;
+    color: white;
+    padding: 20px;
+    margin-top: 0;
+    border-radius: 8px;
+}
+
+h2 {
+    color: #052E16;
+}
+
+h3 {
+    color: #052E16;
+    margin-top: 30px;
+}
+
+
+/* =========================================
+   LINKS
+   ========================================= */
+
+a {
+    color: #052E16;
+    font-weight: bold;
+}
+
+a:hover {
+    color: #22C55E;
+}
+
+
+/* =========================================
+   FORMULIEREN
+   ========================================= */
+
+input,
+select,
+textarea {
+    width: 100%;
+    max-width: 500px;
+    padding: 10px;
+    margin-top: 5px;
+    border: 1px solid #cccccc;
+    border-radius: 6px;
+    font-size: 16px;
+}
+
+input[type="radio"] {
+    width: auto;
+}
+
+
+/* =========================================
+   KNOPPEN
+   ========================================= */
+
+button {
+    background: #22C55E;
+    color: #052E16;
+    border: none;
+    padding: 10px 16px;
+    border-radius: 6px;
+    font-size: 15px;
+    font-weight: bold;
+    cursor: pointer;
+    margin-top: 5px;
+}
+
+button:hover {
+    opacity: 0.85;
+}
+
+
+/* =========================================
+   KAARTEN / ONDERDELEN
+   ========================================= */
+
+div {
+    background: white;
+    padding: 15px;
+    margin-bottom: 12px;
+    border-radius: 8px;
+}
+
+hr {
+    border: 0;
+    border-top: 1px solid #dddddd;
+    margin: 15px 0;
+}
+
+
+/* =========================================
+   VOORTGANG
+   ========================================= */
+
+progress {
+    width: 100%;
+    max-width: 400px;
+    height: 20px;
+}
+
+
+/* =========================================
+   MOBIEL / RESPONSIVE
+   ========================================= */
+
+@media (max-width: 600px) {
+
+    body {
+        padding: 15px;
+    }
+
+    h1 {
+        padding: 15px;
+        font-size: 24px;
+    }
+
+    h2 {
+        font-size: 20px;
+    }
+
+    h3 {
+        font-size: 18px;
+    }
+
+    input,
+    select,
+    textarea {
+        max-width: 100%;
+    }
+
+    button {
+        width: 100%;
+        margin-bottom: 5px;
+    }
+}
