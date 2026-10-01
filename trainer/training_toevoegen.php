@@ -1,63 +1,96 @@
 ﻿<?php
 
-// Start de sessie.
 session_start();
-
-// Laad de databaseverbinding.
 require_once '../config/database.php';
 
-// Controleer of de gebruiker is ingelogd.
+// Alleen een ingelogde trainer mag deze pagina gebruiken.
 if (!isset($_SESSION['user_id'])) {
     header('Location: ../login.php');
     exit;
 }
 
-// Alleen een trainer mag deze pagina gebruiken.
 if ($_SESSION['rol'] !== 'trainer') {
     die('Geen toegang tot deze pagina.');
 }
 
-// Haal het team-ID van de trainer uit de sessie.
 $teamId = $_SESSION['team_id'];
 
-// Hier bewaren we meldingen.
-$melding = '';
 $foutmelding = '';
+$succesmelding = '';
 
-// Controleer of het formulier is verstuurd.
+
+// ----------------------------------------------------
+// TRAINING TOEVOEGEN
+// ----------------------------------------------------
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
-    // Haal de gegevens uit het formulier.
-    $datum = $_POST['datum'];
-    $tijd = $_POST['tijd'];
-    $reactiedeadline = $_POST['reactiedeadline'];
+    $datum = $_POST['datum'] ?? '';
+    $tijd = $_POST['tijd'] ?? '';
+    $reactiedeadline = $_POST['reactiedeadline'] ?? '';
 
     // Controleer of alle velden zijn ingevuld.
-    if ($datum == '' || $tijd == '' || $reactiedeadline == '') {
+    if (
+        $datum === '' ||
+        $tijd === '' ||
+        $reactiedeadline === ''
+    ) {
 
         $foutmelding = 'Vul alle velden in.';
 
     } else {
 
-        // Voeg de training toe aan het team van de trainer.
-        // gewijzigd is 0 omdat dit een nieuwe training is.
-        $sql = "INSERT INTO training
-                (team_id, datum, tijd, gewijzigd, reactiedeadline)
-                VALUES (?, ?, ?, 0, ?)";
+        // Maak van datum en tijd één waarde.
+        // Zo kunnen we deze vergelijken met de deadline.
+        $trainingMoment = strtotime(
+            $datum . ' ' . $tijd
+        );
 
-        // Bereid de query veilig voor.
-        $stmt = $pdo->prepare($sql);
-
-        // Voer de query uit.
-        $stmt->execute([
-            $teamId,
-            $datum,
-            $tijd,
+        $deadlineMoment = strtotime(
             $reactiedeadline
-        ]);
+        );
 
-        // Geef een duidelijke succesmelding.
-        $melding = 'Training is toegevoegd.';
+        // Controleer of de ingevulde waarden geldig zijn.
+        if (
+            $trainingMoment === false ||
+            $deadlineMoment === false
+        ) {
+
+            $foutmelding =
+                'De datum, tijd of reactiedeadline is niet geldig.';
+
+        } elseif ($deadlineMoment >= $trainingMoment) {
+
+            // De sporter moet vóór de training reageren.
+            $foutmelding =
+                'De reactiedeadline moet vóór de training liggen.';
+
+        } else {
+
+            // Sla de training op.
+            // Het team komt uit de sessie en niet uit het formulier.
+            $sql = "INSERT INTO training
+                    (
+                        team_id,
+                        datum,
+                        tijd,
+                        gewijzigd,
+                        reactiedeadline
+                    )
+                    VALUES (?, ?, ?, 0, ?)";
+
+            $stmt = $pdo->prepare($sql);
+
+            $stmt->execute([
+                $teamId,
+                $datum,
+                $tijd,
+                $reactiedeadline
+            ]);
+
+            $succesmelding =
+                'Training is succesvol toegevoegd.';
+        }
     }
 }
 
@@ -67,27 +100,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <html lang="nl">
 
 <head>
+
     <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
     <title>TeamTrack - Training toevoegen</title>
-<link rel="stylesheet" href="../css/style.css">
+
+    <link
+        rel="stylesheet"
+        href="../css/style.css"
+    >
+
 </head>
 
 <body>
 
-    <h1>TeamTrack</h1>
+    <h1>Training toevoegen</h1>
 
-    <h2>Training toevoegen</h2>
 
-    <?php if ($melding != '') { ?>
-
-        <p>
-            <?php echo htmlspecialchars($melding); ?>
-        </p>
-
-    <?php } ?>
-
-    <?php if ($foutmelding != '') { ?>
+    <?php if ($foutmelding !== '') { ?>
 
         <p>
             <?php echo htmlspecialchars($foutmelding); ?>
@@ -95,9 +130,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     <?php } ?>
 
+
+    <?php if ($succesmelding !== '') { ?>
+
+        <p>
+            <?php echo htmlspecialchars($succesmelding); ?>
+        </p>
+
+    <?php } ?>
+
+
     <form method="POST">
 
-        <label for="datum">Datum</label>
+        <label for="datum">
+            Datum
+        </label>
+
         <br>
 
         <input
@@ -109,7 +157,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         <br><br>
 
-        <label for="tijd">Tijd</label>
+
+        <label for="tijd">
+            Tijd
+        </label>
+
         <br>
 
         <input
@@ -120,6 +172,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         >
 
         <br><br>
+
 
         <label for="reactiedeadline">
             Reactiedeadline
@@ -136,23 +189,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         <br><br>
 
+
         <button type="submit">
             Training toevoegen
         </button>
 
     </form>
 
-    <p>
-        <a href="dashboard.php">
-            Terug naar dashboard
-        </a>
-    </p>
 
-    <p>
-        <a href="../logout.php">
-            Uitloggen
-        </a>
-    </p>
+    <br>
+
+    <a href="dashboard.php">
+        Terug naar dashboard
+    </a>
 
 </body>
 

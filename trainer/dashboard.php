@@ -1,14 +1,15 @@
-<?php
+﻿<?php
 
 session_start();
 require_once '../config/database.php';
 
-// Alleen ingelogde trainers mogen deze pagina gebruiken.
+// Alleen ingelogde gebruikers.
 if (!isset($_SESSION['user_id'])) {
     header('Location: ../login.php');
     exit;
 }
 
+// Alleen trainers.
 if ($_SESSION['rol'] !== 'trainer') {
     die('Geen toegang tot deze pagina.');
 }
@@ -66,8 +67,21 @@ $trainingen = $stmt->fetchAll();
 <html lang="nl">
 
 <head>
+
     <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
     <title>TeamTrack - Trainer Dashboard</title>
+
+    <link
+        rel="stylesheet"
+        href="../css/style.css"
+    >
+
 </head>
 
 <body>
@@ -83,49 +97,79 @@ $trainingen = $stmt->fetchAll();
 
 
     <!-- ============================================= -->
-    <!-- SNELMENU -->
+    <!-- BEHEERMENU -->
     <!-- ============================================= -->
 
     <h3>Beheer</h3>
 
-    <p>
-        <a href="sporter_toevoegen.php">
-            Sporter toevoegen
-        </a>
-        |
-        <a href="training_toevoegen.php">
-            Training toevoegen
-        </a>
-        |
-        <a href="oefeningen.php">
-            Oefeningen beheren
-        </a>
-        |
-        <a href="oefening_koppelen.php">
-            Oefening koppelen
-        </a>
-        |
-        <a href="aanwezigheid.php">
-            Aanwezigheid registreren
-        </a>
-        |
-        <a href="doelen.php">
-            Doelen beheren
-        </a>
-    </p>
+    <div>
+
+        <p>
+            <a href="team_bewerken.php">
+                Team bewerken
+            </a>
+        </p>
+
+        <p>
+            <a href="sporter_toevoegen.php">
+                Sporter toevoegen
+            </a>
+        </p>
+
+        <p>
+            <a href="training_toevoegen.php">
+                Training toevoegen
+            </a>
+        </p>
+
+        <p>
+            <a href="oefeningen.php">
+                Oefeningen beheren
+            </a>
+        </p>
+
+        <p>
+            <a href="oefening_koppelen.php">
+                Oefening koppelen
+            </a>
+        </p>
+
+        <p>
+            <a href="aanwezigheid.php">
+                Aanwezigheid registreren
+            </a>
+        </p>
+
+        <p>
+            <a href="doelen.php">
+                Doelen beheren
+            </a>
+        </p>
+
+    </div>
 
 
     <!-- ============================================= -->
-    <!-- TEAM -->
+    <!-- MIJN TEAM -->
     <!-- ============================================= -->
 
     <h3>Mijn team</h3>
 
     <?php if ($team) { ?>
 
-        <p>
-            <?php echo htmlspecialchars($team['naam']); ?>
-        </p>
+        <div>
+
+            <strong>
+                <?php echo htmlspecialchars($team['naam']); ?>
+            </strong>
+
+            <br><br>
+
+            <a href="team_bewerken.php">
+                Team bewerken
+            </a>
+
+        </div>
 
     <?php } else { ?>
 
@@ -168,7 +212,25 @@ $trainingen = $stmt->fetchAll();
                     Bewerken
                 </a>
 
-                <hr>
+                <form
+                    method="POST"
+                    action="sporter_verwijderen.php"
+                    onsubmit="return confirm('Weet je zeker dat je deze sporter wilt verwijderen?');"
+                >
+
+                    <input
+                        type="hidden"
+                        name="user_id"
+                        value="<?php
+                            echo $sporter['user_id'];
+                        ?>"
+                    >
+
+                    <button type="submit">
+                        Verwijderen
+                    </button>
+
+                </form>
 
             </div>
 
@@ -210,7 +272,6 @@ $trainingen = $stmt->fetchAll();
 
                 <br>
 
-
                 <strong>Tijd:</strong>
 
                 <?php
@@ -219,17 +280,24 @@ $trainingen = $stmt->fetchAll();
 
                 <br>
 
-
                 <strong>Reactiedeadline:</strong>
 
                 <?php
-                echo htmlspecialchars(
-                    $training['reactiedeadline']
-                );
+
+                if ($training['reactiedeadline'] !== null) {
+
+                    echo htmlspecialchars(
+                        $training['reactiedeadline']
+                    );
+
+                } else {
+
+                    echo 'Geen deadline';
+                }
+
                 ?>
 
                 <br>
-
 
                 <strong>Status:</strong>
 
@@ -252,7 +320,28 @@ $trainingen = $stmt->fetchAll();
                     Bewerken
                 </a>
 
-                <hr>
+
+                <!-- Training verwijderen via POST -->
+
+                <form
+                    method="POST"
+                    action="training_verwijderen.php"
+                    onsubmit="return confirm('Weet je zeker dat je deze training wilt verwijderen?');"
+                >
+
+                    <input
+                        type="hidden"
+                        name="training_id"
+                        value="<?php
+                            echo $training['training_id'];
+                        ?>"
+                    >
+
+                    <button type="submit">
+                        Verwijderen
+                    </button>
+
+                </form>
 
             </div>
 
@@ -266,6 +355,10 @@ $trainingen = $stmt->fetchAll();
 
     <?php } ?>
 
+
+    <!-- ============================================= -->
+    <!-- UITLOGGEN -->
+    <!-- ============================================= -->
 
     <p>
         <a href="../logout.php">

@@ -388,6 +388,12 @@ $trainingen = $stmt->fetchAll();
 
     <h3>Mijn trainingen</h3>
 
+    <p>
+        <a href="kalender.php">
+            Bekijk trainingskalender
+        </a>
+    </p>
+
 
     <?php if (count($trainingen) > 0) { ?>
 
@@ -554,3 +560,4 @@ $trainingen = $stmt->fetchAll();
 </body>
 
 </html>
+

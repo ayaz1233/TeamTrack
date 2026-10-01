@@ -1,48 +1,43 @@
 ﻿<?php
 
-// Start de sessie.
 session_start();
-
-// Laad de databaseverbinding.
 require_once '../config/database.php';
 
-// Controleer of de gebruiker is ingelogd.
+// Alleen ingelogde gebruikers.
 if (!isset($_SESSION['user_id'])) {
     header('Location: ../login.php');
     exit;
 }
 
-// Alleen trainers mogen deze pagina gebruiken.
+// Alleen trainers.
 if ($_SESSION['rol'] !== 'trainer') {
     die('Geen toegang tot deze pagina.');
 }
 
-// Team van de ingelogde trainer.
 $teamId = $_SESSION['team_id'];
 
 $foutmelding = '';
+$succesmelding = '';
 
 
 // ----------------------------------------------------
 // TRAINING-ID CONTROLEREN
 // ----------------------------------------------------
 
-// Controleer of er een training-ID is meegegeven.
-if (!isset($_GET['id'])) {
+$trainingId = $_GET['id'] ?? '';
+
+if ($trainingId === '') {
     die('Geen training gekozen.');
 }
-
-$trainingId = $_GET['id'];
 
 
 // ----------------------------------------------------
 // TRAINING OPHALEN
+// Alleen een training van het eigen team.
 // ----------------------------------------------------
 
-// We controleren ook het team-ID.
-// Hierdoor kan een trainer geen training
-// van een ander team bewerken.
-$sql = "SELECT * FROM training
+$sql = "SELECT *
+        FROM training
         WHERE training_id = ?
         AND team_id = ?";
 
@@ -54,55 +49,107 @@ $stmt->execute([
 
 $training = $stmt->fetch();
 
-
-// Stop als de training niet bestaat
-// of niet bij het team hoort.
 if (!$training) {
-    die('Geen toegang tot deze training.');
+    die('Training niet gevonden of geen toegang.');
 }
 
 
 // ----------------------------------------------------
-// TRAINING BEWERKEN
+// WIJZIGING OPSLAAN
 // ----------------------------------------------------
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
-    $datum = $_POST['datum'];
-    $tijd = $_POST['tijd'];
-    $reactiedeadline = $_POST['reactiedeadline'];
+    $datum = $_POST['datum'] ?? '';
+    $tijd = $_POST['tijd'] ?? '';
+    $reactiedeadline = $_POST['reactiedeadline'] ?? '';
 
-    // Controleer of alles is ingevuld.
-    if ($datum == '' || $tijd == '' || $reactiedeadline == '') {
+    if (
+        $datum === '' ||
+        $tijd === '' ||
+        $reactiedeadline === ''
+    ) {
 
         $foutmelding = 'Vul alle velden in.';
 
     } else {
 
-        // Werk de training bij.
-        // gewijzigd wordt 1 zodat sporters kunnen zien
-        // dat deze training aangepast is.
-        $sql = "UPDATE training
-                SET datum = ?,
-                    tijd = ?,
-                    reactiedeadline = ?,
-                    gewijzigd = 1
-                WHERE training_id = ?
-                AND team_id = ?";
+        // Maak vergelijkbare datum/tijd-waarden.
+        $trainingMoment = strtotime(
+            $datum . ' ' . $tijd
+        );
 
-        $stmt = $pdo->prepare($sql);
+        $deadlineMoment = strtotime(
+            $reactiedeadline
+        );
 
-        $stmt->execute([
-            $datum,
-            $tijd,
-            $reactiedeadline,
-            $trainingId,
-            $teamId
-        ]);
+        if (
+            $trainingMoment === false ||
+            $deadlineMoment === false
+        ) {
 
-        // Ga na het opslaan terug naar het dashboard.
-        header('Location: dashboard.php');
-        exit;
+            $foutmelding =
+                'De datum, tijd of reactiedeadline is niet geldig.';
+
+        } elseif ($deadlineMoment >= $trainingMoment) {
+
+            $foutmelding =
+                'De reactiedeadline moet vóór de training liggen.';
+
+        } else {
+
+            // Controleer of datum of tijd echt is veranderd.
+            if (
+                $datum !== $training['datum'] ||
+                $tijd !== $training['tijd']
+            ) {
+                $gewijzigd = 1;
+            } else {
+                // Bewaar bestaande status.
+                $gewijzigd = $training['gewijzigd'];
+            }
+
+
+            // Training bijwerken.
+            // team_id staat ook in de WHERE voor extra controle.
+            $sql = "UPDATE training
+                    SET datum = ?,
+                        tijd = ?,
+                        reactiedeadline = ?,
+                        gewijzigd = ?
+                    WHERE training_id = ?
+                    AND team_id = ?";
+
+            $stmt = $pdo->prepare($sql);
+
+            $stmt->execute([
+                $datum,
+                $tijd,
+                $reactiedeadline,
+                $gewijzigd,
+                $trainingId,
+                $teamId
+            ]);
+
+            $succesmelding =
+                'Training is succesvol bijgewerkt.';
+
+
+            // Haal de bijgewerkte training opnieuw op.
+            $sql = "SELECT *
+                    FROM training
+                    WHERE training_id = ?
+                    AND team_id = ?";
+
+            $stmt = $pdo->prepare($sql);
+
+            $stmt->execute([
+                $trainingId,
+                $teamId
+            ]);
+
+            $training = $stmt->fetch();
+        }
     }
 }
 
@@ -114,24 +161,39 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <head>
 
     <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
 
     <title>TeamTrack - Training bewerken</title>
 
-<link rel="stylesheet" href="../css/style.css">
+    <link
+        rel="stylesheet"
+        href="../css/style.css"
+    >
+
 </head>
 
 <body>
 
-    <h1>TeamTrack</h1>
-
-    <h2>Training bewerken</h2>
+    <h1>Training bewerken</h1>
 
 
-    <?php if ($foutmelding != '') { ?>
+    <?php if ($foutmelding !== '') { ?>
 
         <p>
             <?php echo htmlspecialchars($foutmelding); ?>
+        </p>
+
+    <?php } ?>
+
+
+    <?php if ($succesmelding !== '') { ?>
+
+        <p>
+            <?php echo htmlspecialchars($succesmelding); ?>
         </p>
 
     <?php } ?>
@@ -149,7 +211,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             type="date"
             id="datum"
             name="datum"
-            value="<?php echo htmlspecialchars($training['datum']); ?>"
+            value="<?php
+                echo htmlspecialchars(
+                    $training['datum']
+                );
+            ?>"
             required
         >
 
@@ -166,7 +232,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             type="time"
             id="tijd"
             name="tijd"
-            value="<?php echo htmlspecialchars($training['tijd']); ?>"
+            value="<?php
+                echo htmlspecialchars(
+                    substr($training['tijd'], 0, 5)
+                );
+            ?>"
             required
         >
 
@@ -184,10 +254,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             id="reactiedeadline"
             name="reactiedeadline"
             value="<?php
-                echo date(
-                    'Y-m-d\TH:i',
-                    strtotime($training['reactiedeadline'])
-                );
+
+                if ($training['reactiedeadline'] !== null) {
+
+                    echo htmlspecialchars(
+                        date(
+                            'Y-m-d\TH:i',
+                            strtotime(
+                                $training['reactiedeadline']
+                            )
+                        )
+                    );
+                }
+
             ?>"
             required
         >
@@ -202,13 +281,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     </form>
 
 
-    <p>
-        <a href="dashboard.php">
-            Terug naar dashboard
-        </a>
-    </p>
+    <br>
+
+    <a href="dashboard.php">
+        Terug naar dashboard
+    </a>
 
 </body>
 
 </html>
-
