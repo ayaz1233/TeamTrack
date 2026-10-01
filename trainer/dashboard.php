@@ -1,23 +1,18 @@
 <?php
 
-// Start de sessie.
 session_start();
-
-// Laad de databaseverbinding.
 require_once '../config/database.php';
 
-// Controleer of de gebruiker is ingelogd.
+// Alleen ingelogde trainers mogen deze pagina gebruiken.
 if (!isset($_SESSION['user_id'])) {
     header('Location: ../login.php');
     exit;
 }
 
-// Alleen een trainer mag deze pagina openen.
 if ($_SESSION['rol'] !== 'trainer') {
     die('Geen toegang tot deze pagina.');
 }
 
-// Haal het team-ID van de trainer uit de sessie.
 $teamId = $_SESSION['team_id'];
 
 
@@ -25,7 +20,9 @@ $teamId = $_SESSION['team_id'];
 // TEAM OPHALEN
 // ----------------------------------------------------
 
-$sql = "SELECT * FROM team WHERE team_id = ?";
+$sql = "SELECT *
+        FROM team
+        WHERE team_id = ?";
 
 $stmt = $pdo->prepare($sql);
 $stmt->execute([$teamId]);
@@ -34,12 +31,11 @@ $team = $stmt->fetch();
 
 
 // ----------------------------------------------------
-// SPORTERS VAN HET EIGEN TEAM OPHALEN
+// SPORTERS OPHALEN
 // ----------------------------------------------------
 
-// Alleen gebruikers met de rol sporter
-// en hetzelfde team worden opgehaald.
-$sql = "SELECT * FROM user
+$sql = "SELECT *
+        FROM user
         WHERE team_id = ?
         AND rol = 'sporter'
         ORDER BY naam ASC";
@@ -51,10 +47,11 @@ $sporters = $stmt->fetchAll();
 
 
 // ----------------------------------------------------
-// TRAININGEN VAN HET EIGEN TEAM OPHALEN
+// TRAININGEN OPHALEN
 // ----------------------------------------------------
 
-$sql = "SELECT * FROM training
+$sql = "SELECT *
+        FROM training
         WHERE team_id = ?
         ORDER BY datum ASC, tijd ASC";
 
@@ -69,11 +66,8 @@ $trainingen = $stmt->fetchAll();
 <html lang="nl">
 
 <head>
-
     <meta charset="UTF-8">
-
     <title>TeamTrack - Trainer Dashboard</title>
-
 </head>
 
 <body>
@@ -87,6 +81,43 @@ $trainingen = $stmt->fetchAll();
 
     <p>Je bent ingelogd als trainer.</p>
 
+
+    <!-- ============================================= -->
+    <!-- SNELMENU -->
+    <!-- ============================================= -->
+
+    <h3>Beheer</h3>
+
+    <p>
+        <a href="sporter_toevoegen.php">
+            Sporter toevoegen
+        </a>
+        |
+        <a href="training_toevoegen.php">
+            Training toevoegen
+        </a>
+        |
+        <a href="oefeningen.php">
+            Oefeningen beheren
+        </a>
+        |
+        <a href="oefening_koppelen.php">
+            Oefening koppelen
+        </a>
+        |
+        <a href="aanwezigheid.php">
+            Aanwezigheid registreren
+        </a>
+        |
+        <a href="doelen.php">
+            Doelen beheren
+        </a>
+    </p>
+
+
+    <!-- ============================================= -->
+    <!-- TEAM -->
+    <!-- ============================================= -->
 
     <h3>Mijn team</h3>
 
@@ -102,6 +133,10 @@ $trainingen = $stmt->fetchAll();
 
     <?php } ?>
 
+
+    <!-- ============================================= -->
+    <!-- SPORTERS -->
+    <!-- ============================================= -->
 
     <h3>Sporters</h3>
 
@@ -125,6 +160,14 @@ $trainingen = $stmt->fetchAll();
                 echo htmlspecialchars($sporter['email']);
                 ?>
 
+                <br><br>
+
+                <a href="sporter_bewerken.php?id=<?php
+                    echo $sporter['user_id'];
+                ?>">
+                    Bewerken
+                </a>
+
                 <hr>
 
             </div>
@@ -133,12 +176,25 @@ $trainingen = $stmt->fetchAll();
 
     <?php } else { ?>
 
-        <p>Er zijn nog geen sporters in dit team.</p>
+        <p>
+            Er zijn nog geen sporters in dit team.
+        </p>
 
     <?php } ?>
 
 
+    <!-- ============================================= -->
+    <!-- TRAININGEN -->
+    <!-- ============================================= -->
+
     <h3>Trainingen</h3>
+
+    <p>
+        <a href="training_toevoegen.php">
+            Nieuwe training toevoegen
+        </a>
+    </p>
+
 
     <?php if (count($trainingen) > 0) { ?>
 
@@ -154,6 +210,7 @@ $trainingen = $stmt->fetchAll();
 
                 <br>
 
+
                 <strong>Tijd:</strong>
 
                 <?php
@@ -162,13 +219,17 @@ $trainingen = $stmt->fetchAll();
 
                 <br>
 
+
                 <strong>Reactiedeadline:</strong>
 
                 <?php
-                echo htmlspecialchars($training['reactiedeadline']);
+                echo htmlspecialchars(
+                    $training['reactiedeadline']
+                );
                 ?>
 
                 <br>
+
 
                 <strong>Status:</strong>
 
@@ -182,6 +243,15 @@ $trainingen = $stmt->fetchAll();
 
                 ?>
 
+                <br><br>
+
+
+                <a href="training_bewerken.php?id=<?php
+                    echo $training['training_id'];
+                ?>">
+                    Bewerken
+                </a>
+
                 <hr>
 
             </div>
@@ -190,7 +260,9 @@ $trainingen = $stmt->fetchAll();
 
     <?php } else { ?>
 
-        <p>Er zijn nog geen trainingen gepland.</p>
+        <p>
+            Er zijn nog geen trainingen gepland.
+        </p>
 
     <?php } ?>
 
