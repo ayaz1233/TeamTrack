@@ -42,6 +42,7 @@ $sql = "SELECT *
         AND team_id = ?";
 
 $stmt = $pdo->prepare($sql);
+
 $stmt->execute([
     $trainingId,
     $teamId
@@ -61,20 +62,39 @@ if (!$training) {
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     $datum = $_POST['datum'] ?? '';
-    $tijd = $_POST['tijd'] ?? '';
-    $reactiedeadline = $_POST['reactiedeadline'] ?? '';
+
+    // Nieuwe trainingstijd uit de dropdowns.
+    $trainingUur = $_POST['training_uur'] ?? '';
+    $trainingMinuut = $_POST['training_minuut'] ?? '';
+
+    // Nieuwe reactiedeadline uit de dropdowns.
+    $deadlineDatum = $_POST['deadline_datum'] ?? '';
+    $deadlineUur = $_POST['deadline_uur'] ?? '';
+    $deadlineMinuut = $_POST['deadline_minuut'] ?? '';
 
     if (
         $datum === '' ||
-        $tijd === '' ||
-        $reactiedeadline === ''
+        $trainingUur === '' ||
+        $trainingMinuut === '' ||
+        $deadlineDatum === '' ||
+        $deadlineUur === '' ||
+        $deadlineMinuut === ''
     ) {
 
         $foutmelding = 'Vul alle velden in.';
 
     } else {
 
-        // Maak vergelijkbare datum/tijd-waarden.
+        // Maak de trainingstijd.
+        $tijd = $trainingUur . ':' . $trainingMinuut;
+
+        // Maak de reactiedeadline.
+        $reactiedeadline =
+            $deadlineDatum . ' ' .
+            $deadlineUur . ':' .
+            $deadlineMinuut . ':00';
+
+        // Maak vergelijkbare tijdstippen.
         $trainingMoment = strtotime(
             $datum . ' ' . $tijd
         );
@@ -89,7 +109,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         ) {
 
             $foutmelding =
-                'De datum, tijd of reactiedeadline is niet geldig.';
+                'De datum of tijd is niet geldig.';
 
         } elseif ($deadlineMoment >= $trainingMoment) {
 
@@ -98,20 +118,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         } else {
 
-            // Controleer of datum of tijd echt is veranderd.
+            // In MySQL kan de tijd bijvoorbeeld 18:00:00 zijn.
+            // In het formulier gebruiken we 18:00.
+            // Daarom vergelijken we alleen uur en minuten.
+            $oudeTijd = substr(
+                $training['tijd'],
+                0,
+                5
+            );
+
+            // Alleen datum- of tijdwijzigingen markeren
+            // de training als gewijzigd.
             if (
                 $datum !== $training['datum'] ||
-                $tijd !== $training['tijd']
+                $tijd !== $oudeTijd
             ) {
+
                 $gewijzigd = 1;
+
             } else {
-                // Bewaar bestaande status.
+
+                // Bewaar de bestaande status.
                 $gewijzigd = $training['gewijzigd'];
             }
 
 
             // Training bijwerken.
-            // team_id staat ook in de WHERE voor extra controle.
             $sql = "UPDATE training
                     SET datum = ?,
                         tijd = ?,
@@ -151,6 +183,48 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $training = $stmt->fetch();
         }
     }
+}
+
+
+// ----------------------------------------------------
+// HUIDIGE WAARDEN VOOR HET FORMULIER
+// ----------------------------------------------------
+
+// Tijd van training.
+$huidigUur = substr(
+    $training['tijd'],
+    0,
+    2
+);
+
+$huidigeMinuut = substr(
+    $training['tijd'],
+    3,
+    2
+);
+
+
+// Deadline.
+$deadlineDatum = '';
+$deadlineUur = '';
+$deadlineMinuut = '';
+
+if ($training['reactiedeadline'] !== null) {
+
+    $deadlineDatum = date(
+        'Y-m-d',
+        strtotime($training['reactiedeadline'])
+    );
+
+    $deadlineUur = date(
+        'H',
+        strtotime($training['reactiedeadline'])
+    );
+
+    $deadlineMinuut = date(
+        'i',
+        strtotime($training['reactiedeadline'])
+    );
 }
 
 ?>
@@ -201,8 +275,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     <form method="POST">
 
+        <!-- DATUM TRAINING -->
+
         <label for="datum">
-            Datum
+            Datum training
         </label>
 
         <br>
@@ -222,19 +298,105 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <br><br>
 
 
-        <label for="tijd">
-            Tijd
+        <!-- TIJD TRAINING -->
+
+        <label>
+            Tijd training
+        </label>
+
+        <br>
+
+        <select
+            name="training_uur"
+            required
+        >
+
+            <option value="">
+                Uur
+            </option>
+
+            <?php for ($uur = 0; $uur <= 23; $uur++) { ?>
+
+                <?php
+                $uurWaarde = str_pad(
+                    $uur,
+                    2,
+                    '0',
+                    STR_PAD_LEFT
+                );
+                ?>
+
+                <option
+                    value="<?php echo $uurWaarde; ?>"
+                    <?php
+                    if ($uurWaarde === $huidigUur) {
+                        echo 'selected';
+                    }
+                    ?>
+                >
+                    <?php echo $uurWaarde; ?>
+                </option>
+
+            <?php } ?>
+
+        </select>
+
+
+        <select
+            name="training_minuut"
+            required
+        >
+
+            <option value="">
+                Minuten
+            </option>
+
+            <?php
+            $minuten = ['00', '15', '30', '45'];
+            ?>
+
+            <?php foreach ($minuten as $minuut) { ?>
+
+                <option
+                    value="<?php echo $minuut; ?>"
+                    <?php
+                    if ($minuut === $huidigeMinuut) {
+                        echo 'selected';
+                    }
+                    ?>
+                >
+                    <?php echo $minuut; ?>
+                </option>
+
+            <?php } ?>
+
+        </select>
+
+        <br><br>
+
+
+        <!-- REACTIEDEADLINE -->
+
+        <h3>Reactiedeadline</h3>
+
+        <p>
+            Tot wanneer mag de sporter reageren?
+        </p>
+
+
+        <label for="deadline_datum">
+            Datum deadline
         </label>
 
         <br>
 
         <input
-            type="time"
-            id="tijd"
-            name="tijd"
+            type="date"
+            id="deadline_datum"
+            name="deadline_datum"
             value="<?php
                 echo htmlspecialchars(
-                    substr($training['tijd'], 0, 5)
+                    $deadlineDatum
                 );
             ?>"
             required
@@ -243,33 +405,73 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <br><br>
 
 
-        <label for="reactiedeadline">
-            Reactiedeadline
+        <label>
+            Tijd deadline
         </label>
 
         <br>
 
-        <input
-            type="datetime-local"
-            id="reactiedeadline"
-            name="reactiedeadline"
-            value="<?php
-
-                if ($training['reactiedeadline'] !== null) {
-
-                    echo htmlspecialchars(
-                        date(
-                            'Y-m-d\TH:i',
-                            strtotime(
-                                $training['reactiedeadline']
-                            )
-                        )
-                    );
-                }
-
-            ?>"
+        <select
+            name="deadline_uur"
             required
         >
+
+            <option value="">
+                Uur
+            </option>
+
+            <?php for ($uur = 0; $uur <= 23; $uur++) { ?>
+
+                <?php
+                $uurWaarde = str_pad(
+                    $uur,
+                    2,
+                    '0',
+                    STR_PAD_LEFT
+                );
+                ?>
+
+                <option
+                    value="<?php echo $uurWaarde; ?>"
+                    <?php
+                    if ($uurWaarde === $deadlineUur) {
+                        echo 'selected';
+                    }
+                    ?>
+                >
+                    <?php echo $uurWaarde; ?>
+                </option>
+
+            <?php } ?>
+
+        </select>
+
+
+        <select
+            name="deadline_minuut"
+            required
+        >
+
+            <option value="">
+                Minuten
+            </option>
+
+            <?php foreach ($minuten as $minuut) { ?>
+
+                <option
+                    value="<?php echo $minuut; ?>"
+                    <?php
+                    if ($minuut === $deadlineMinuut) {
+                        echo 'selected';
+                    }
+                    ?>
+                >
+                    <?php echo $minuut; ?>
+                </option>
+
+            <?php } ?>
+
+        </select>
 
         <br><br>
 
