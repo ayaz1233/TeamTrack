@@ -49,107 +49,340 @@ $trainingen = $stmt->fetchAll();
 
     <link
         rel="stylesheet"
-        href="../css/style.css"
+        href="../css/style.css?v=5"
     >
+
+    <style>
+
+        /*
+         * Opmaak van de trainingskalender.
+         * Elke training krijgt een eigen kaart.
+         */
+
+        .calendar-container {
+            width: 100%;
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+
+        .calendar-header {
+            margin-bottom: 30px;
+        }
+
+        .calendar-header h1 {
+            margin-bottom: 8px;
+        }
+
+        .calendar-header p {
+            color: #475569;
+            margin-bottom: 0;
+        }
+
+
+        /* Trainingen */
+
+        .calendar-list {
+            display: grid;
+            gap: 16px;
+        }
+
+        .calendar-training {
+            background: white;
+            border: 1px solid #E2E8F0;
+            border-radius: 12px;
+            padding: 22px;
+        }
+
+        .calendar-training-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 18px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid #E2E8F0;
+        }
+
+        .calendar-training-top strong {
+            color: #052E16;
+            font-size: 19px;
+        }
+
+
+        /* Status */
+
+        .calendar-status {
+            display: inline-block;
+            background: #DCFCE7;
+            color: #166534;
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+
+        .calendar-status.changed {
+            background: #FEF3C7;
+            color: #92400E;
+        }
+
+
+        /* Details */
+
+        .calendar-details {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .calendar-details p {
+            margin: 0;
+            color: #0F172A;
+        }
+
+        .calendar-details strong {
+            color: #052E16;
+        }
+
+
+        /* Waarschuwing */
+
+        .calendar-warning {
+            background: #FFF7ED;
+            border-left: 4px solid #F59E0B;
+            color: #92400E;
+            padding: 11px 14px;
+            border-radius: 6px;
+            margin-top: 16px;
+        }
+
+        .calendar-warning p {
+            margin: 0;
+        }
+
+
+        /* Terugknop */
+
+        .calendar-back {
+            display: inline-block;
+            margin-top: 25px;
+            background: #052E16;
+            color: white;
+            padding: 10px 16px;
+            border-radius: 7px;
+            text-decoration: none;
+            font-weight: bold;
+        }
+
+        .calendar-back:hover {
+            background: #22C55E;
+            color: #052E16;
+        }
+
+
+        /* Geen trainingen */
+
+        .calendar-empty {
+            background: white;
+            border: 1px dashed #CBD5E1;
+            border-radius: 10px;
+            padding: 25px;
+            color: #64748B;
+        }
+
+
+        /* Mobiel */
+
+        @media (max-width: 600px) {
+
+            .calendar-training {
+                padding: 18px;
+            }
+
+            .calendar-training-top {
+                align-items: flex-start;
+            }
+        }
+
+    </style>
 
 </head>
 
 <body>
 
-    <h1>Trainingskalender</h1>
+<div class="calendar-container">
 
-    <p>
-        Hier zie je de geplande trainingen van jouw team.
-    </p>
 
+    <!-- PAGINATITEL -->
+
+    <div class="calendar-header">
+
+        <h1>Trainingskalender</h1>
+
+        <p>
+            Hier zie je de geplande trainingen van jouw team.
+        </p>
+
+    </div>
+
+
+    <!-- TRAININGEN -->
 
     <?php if (count($trainingen) > 0) { ?>
 
-        <?php foreach ($trainingen as $training) { ?>
+        <div class="calendar-list">
 
-            <div>
+            <?php foreach ($trainingen as $training) { ?>
 
-                <strong>Datum:</strong>
-
-                <?php
-                echo htmlspecialchars($training['datum']);
-                ?>
-
-                <br>
+                <div class="calendar-training">
 
 
-                <strong>Tijd:</strong>
+                    <!-- BOVENKANT -->
 
-                <?php
-                echo htmlspecialchars(
-                    substr($training['tijd'], 0, 5)
-                );
-                ?>
+                    <div class="calendar-training-top">
 
-                <br>
+                        <strong>
 
+                            <?php
+                            echo date(
+                                'd-m-Y',
+                                strtotime($training['datum'])
+                            );
+                            ?>
 
-                <strong>Status:</strong>
-
-                <?php
-
-                if ($training['gewijzigd'] == 1) {
-
-                    echo 'Gewijzigd';
-
-                } else {
-
-                    echo 'Gepland';
-                }
-
-                ?>
+                        </strong>
 
 
-                <?php if ($training['gewijzigd'] == 1) { ?>
+                        <?php if ($training['gewijzigd'] == 1) { ?>
 
-                    <p>
-                        Let op: de datum of tijd van deze
-                        training is gewijzigd.
-                    </p>
+                            <span class="calendar-status changed">
+                                Gewijzigd
+                            </span>
 
-                <?php } ?>
+                        <?php } else { ?>
+
+                            <span class="calendar-status">
+                                Gepland
+                            </span>
+
+                        <?php } ?>
+
+                    </div>
 
 
-                <strong>Reactiedeadline:</strong>
+                    <!-- DETAILS -->
 
-                <?php
+                    <div class="calendar-details">
 
-                if ($training['reactiedeadline'] !== null) {
+                        <p>
+                            <strong>Datum:</strong>
 
-                    echo htmlspecialchars(
-                        $training['reactiedeadline']
-                    );
+                            <?php
+                            echo date(
+                                'd-m-Y',
+                                strtotime($training['datum'])
+                            );
+                            ?>
+                        </p>
 
-                } else {
 
-                    echo 'Geen deadline ingesteld';
-                }
+                        <p>
+                            <strong>Tijd:</strong>
 
-                ?>
+                            <?php
+                            echo date(
+                                'H:i',
+                                strtotime($training['tijd'])
+                            );
+                            ?>
+                        </p>
 
-            </div>
 
-        <?php } ?>
+                        <p>
+                            <strong>Status:</strong>
+
+                            <?php
+
+                            if ($training['gewijzigd'] == 1) {
+                                echo 'Gewijzigd';
+                            } else {
+                                echo 'Gepland';
+                            }
+
+                            ?>
+                        </p>
+
+
+                        <p>
+                            <strong>Reactiedeadline:</strong>
+
+                            <?php
+
+                            if ($training['reactiedeadline'] !== null) {
+
+                                echo date(
+                                    'd-m-Y H:i',
+                                    strtotime(
+                                        $training['reactiedeadline']
+                                    )
+                                );
+
+                            } else {
+
+                                echo 'Geen deadline ingesteld';
+                            }
+
+                            ?>
+                        </p>
+
+                    </div>
+
+
+                    <!-- WAARSCHUWING BIJ GEWIJZIGDE TRAINING -->
+
+                    <?php if ($training['gewijzigd'] == 1) { ?>
+
+                        <div class="calendar-warning">
+
+                            <p>
+                                <strong>Let op:</strong>
+                                de datum of tijd van deze training
+                                is gewijzigd.
+                            </p>
+
+                        </div>
+
+                    <?php } ?>
+
+
+                </div>
+
+            <?php } ?>
+
+        </div>
 
     <?php } else { ?>
 
-        <p>
+        <div class="calendar-empty">
+
             Er zijn op dit moment geen trainingen gepland.
-        </p>
+
+        </div>
 
     <?php } ?>
 
 
-    <br>
+    <!-- TERUG -->
 
-    <a href="dashboard.php">
-        Terug naar dashboard
+    <a
+        href="dashboard.php"
+        class="calendar-back"
+    >
+        ← Terug naar dashboard
     </a>
+
+
+</div>
 
 </body>
 
