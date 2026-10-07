@@ -61,6 +61,34 @@ $stmt->execute([$teamId]);
 
 $trainingen = $stmt->fetchAll();
 
+
+// ----------------------------------------------------
+// GEKOPPELDE OEFENINGEN PER TRAINING
+// FE-06
+// ----------------------------------------------------
+
+foreach ($trainingen as &$training) {
+
+    $sql = "SELECT
+                exercise.naam,
+                exercise.omschrijving
+            FROM training_exercise
+            INNER JOIN exercise
+            ON training_exercise.exercise_id = exercise.exercise_id
+            WHERE training_exercise.training_id = ?
+            ORDER BY exercise.naam ASC";
+
+    $stmt = $pdo->prepare($sql);
+
+    $stmt->execute([
+        $training['training_id']
+    ]);
+
+    $training['oefeningen'] = $stmt->fetchAll();
+}
+
+unset($training);
+
 ?>
 
 <!DOCTYPE html>
@@ -630,6 +658,77 @@ $trainingen = $stmt->fetchAll();
 
                                     ?>
                                 </p>
+
+                            </div>
+
+
+                            <!-- ===================================== -->
+                            <!-- GEKOPPELDE OEFENINGEN -->
+                            <!-- ===================================== -->
+
+                            <div class="training-details">
+
+                                <p>
+                                    <strong>Oefeningen:</strong>
+                                </p>
+
+                                <?php
+                                if (
+                                    count(
+                                        $training['oefeningen']
+                                    ) > 0
+                                ) {
+                                ?>
+
+                                    <?php
+                                    foreach (
+                                        $training['oefeningen']
+                                        as $oefening
+                                    ) {
+                                    ?>
+
+                                        <p>
+
+                                            <strong>
+                                                <?php
+                                                echo htmlspecialchars(
+                                                    $oefening['naam']
+                                                );
+                                                ?>
+                                            </strong>
+
+                                            <?php
+                                            if (
+                                                !empty(
+                                                    $oefening[
+                                                        'omschrijving'
+                                                    ]
+                                                )
+                                            ) {
+                                            ?>
+
+                                                -
+                                                <?php
+                                                echo htmlspecialchars(
+                                                    $oefening[
+                                                        'omschrijving'
+                                                    ]
+                                                );
+                                                ?>
+
+                                            <?php } ?>
+
+                                        </p>
+
+                                    <?php } ?>
+
+                                <?php } else { ?>
+
+                                    <p>
+                                        Nog geen oefeningen gekoppeld.
+                                    </p>
+
+                                <?php } ?>
 
                             </div>
 

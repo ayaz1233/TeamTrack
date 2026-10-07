@@ -222,6 +222,34 @@ $stmt->execute([
 
 $trainingen = $stmt->fetchAll();
 
+
+// ----------------------------------------------------
+// GEKOPPELDE OEFENINGEN PER TRAINING
+// FE-06
+// ----------------------------------------------------
+
+foreach ($trainingen as &$training) {
+
+    $sql = "SELECT
+                exercise.naam,
+                exercise.omschrijving
+            FROM training_exercise
+            INNER JOIN exercise
+            ON training_exercise.exercise_id = exercise.exercise_id
+            WHERE training_exercise.training_id = ?
+            ORDER BY exercise.naam ASC";
+
+    $stmt = $pdo->prepare($sql);
+
+    $stmt->execute([
+        $training['training_id']
+    ]);
+
+    $training['oefeningen'] = $stmt->fetchAll();
+}
+
+unset($training);
+
 ?>
 
 <!DOCTYPE html>
@@ -238,7 +266,6 @@ $trainingen = $stmt->fetchAll();
 
     <title>TeamTrack - Sporter Dashboard</title>
 
-    <!-- v=4 zorgt dat de browser de nieuwste CSS laadt -->
     <link
         rel="stylesheet"
         href="../css/style.css?v=4"
@@ -248,8 +275,6 @@ $trainingen = $stmt->fetchAll();
 
         /*
          * Extra styling voor het sporter-dashboard.
-         * Dit staat hier zodat de sporterpagina altijd
-         * de juiste dashboardopmaak krijgt.
          */
 
         .sporter-stats-grid {
@@ -388,6 +413,32 @@ $trainingen = $stmt->fetchAll();
             display: block;
             margin: 0;
             font-weight: normal;
+        }
+
+
+        /* Oefeningen */
+
+        .exercise-box {
+            margin-top: 15px;
+            padding: 14px;
+            background: #F8FAFC;
+            border: 1px solid #E2E8F0;
+            border-radius: 8px;
+        }
+
+        .exercise-box > strong {
+            display: block;
+            color: #052E16;
+            margin-bottom: 8px;
+        }
+
+        .exercise-box p {
+            margin: 5px 0;
+            color: #475569;
+        }
+
+        .exercise-box p strong {
+            color: #0F172A;
         }
 
 
@@ -936,6 +987,76 @@ $trainingen = $stmt->fetchAll();
                                 ?>
 
                             </p>
+
+                        </div>
+
+
+                        <!-- GEKOPPELDE OEFENINGEN -->
+
+                        <div class="exercise-box">
+
+                            <strong>
+                                Oefeningen
+                            </strong>
+
+                            <?php
+                            if (
+                                count(
+                                    $training['oefeningen']
+                                ) > 0
+                            ) {
+                            ?>
+
+                                <?php
+                                foreach (
+                                    $training['oefeningen']
+                                    as $oefening
+                                ) {
+                                ?>
+
+                                    <p>
+
+                                        <strong>
+                                            <?php
+                                            echo htmlspecialchars(
+                                                $oefening['naam']
+                                            );
+                                            ?>
+                                        </strong>
+
+                                        <?php
+                                        if (
+                                            !empty(
+                                                $oefening[
+                                                    'omschrijving'
+                                                ]
+                                            )
+                                        ) {
+                                        ?>
+
+                                            -
+                                            <?php
+                                            echo htmlspecialchars(
+                                                $oefening[
+                                                    'omschrijving'
+                                                ]
+                                            );
+                                            ?>
+
+                                        <?php } ?>
+
+                                    </p>
+
+                                <?php } ?>
+
+                            <?php } else { ?>
+
+                                <p>
+                                    Voor deze training zijn nog
+                                    geen oefeningen gekoppeld.
+                                </p>
+
+                            <?php } ?>
 
                         </div>
 
